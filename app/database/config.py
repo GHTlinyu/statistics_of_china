@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     db_name: str
     db_user: str
     db_password: str
+    jwt_secret: str
+    jwt_expire_minutes: int = 1440
 
     model_config = SettingsConfigDict(
         env_file=".env",

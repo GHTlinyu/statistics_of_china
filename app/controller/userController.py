@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
+from app.schema.responseDTO import ApiResponse
 from app.schema.userDTO import UserDTO
 from app.service.userService import UserService
 
@@ -15,7 +16,7 @@ router = APIRouter(
 
 @router.get(
     "/{user_id}",
-    response_model=UserDTO,
+    response_model=ApiResponse[UserDTO],
 )
 def get_user(
     user_id: int,
@@ -32,4 +33,4 @@ def get_user(
             detail="User not found",
         )
 
-    return user
+    return ApiResponse.ok(user)
