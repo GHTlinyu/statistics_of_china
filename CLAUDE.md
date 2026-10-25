@@ -17,8 +17,16 @@ uv run python scripts/setup_agent_skills.py          # 建立 .claude/skills 联
 | `app/` | 后端服务层：`database/`（引擎、会话、配置）、`model/`（SQLAlchemy 模型） |
 | `agent/` | LangGraph 智能体（待建设） |
 | `rag/` | 知识库数据与设计文档，详见 `rag/docs/README.md` |
+| `docs/specs/` | 功能开发全链路文档，见 `docs/specs/README.md` |
 | `.agent/skills/` | 项目 Agent Skills 源文件 |
 | `scripts/` | 开发辅助脚本 |
+
+## 功能开发流程
+
+- 每个新功能在 `docs/specs/<feature-slug>/` 下建立独立目录，按链路推进：
+  `01-requirements.md`（需求规格） → `02-design.md`（设计） → `03-constraints.md`（开发约束） → `04-delivery.md`（交付）
+- 模板位于 `docs/specs/_templates/`，新建功能时复制到功能目录
+- 需求或设计发生变更时，先更新文档并记录变更，再修改代码
 
 ## 开发约定
 
