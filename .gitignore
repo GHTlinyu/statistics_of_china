@@ -12,3 +12,10 @@ wheels/
 
 # uv cache
 .uv-cache
+
+# Secrets
+.env
+
+# Claude Code
+.claude/skills/
+.claude/settings.local.json
