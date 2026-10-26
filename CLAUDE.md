@@ -7,11 +7,13 @@
 **后端（uv 命令在仓库根目录执行**，uv 自动发现 workspace；后端代码统一使用 `backend.app.*` 绝对导入）：
 
 ```bash
-uv sync                                                  # 安装/同步后端依赖
+uv sync --all-packages                                   # 安装/同步所有 workspace 成员依赖
 uv run uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000   # 启动 API 服务
 uv run python -m backend.app.database.init_db            # 初始化数据库表
 uv run python scripts/setup_agent_skills.py              # 建立 .claude/skills 联接
 ```
+
+> 注意：根目录的 `uv sync` **只同步依赖为空的根项目**，会卸载 `backend` 成员的依赖；同步依赖必须用 `uv sync --all-packages`（或在 `backend/` 目录执行 `uv sync`）。
 
 **前端（pnpm 命令在仓库根目录执行**；Node 由 fnm 管理，版本见根目录 `.node-version`，需 `fnm env` 已生效）：
 
