@@ -1,9 +1,9 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.mapper.userMapper import UserMapper
-from app.model.user import User
-from app.security.security import hash_password, verify_password
+from backend.app.mapper.userMapper import UserMapper
+from backend.app.model.user import User
+from backend.app.security.security import hash_password, verify_password
 
 
 class AuthService:

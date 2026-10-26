@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from pwdlib import PasswordHash
 
-from app.database.config import settings
-from app.schema.authDTO import TokenPayload
+from backend.app.database.config import settings
+from backend.app.schema.authDTO import TokenPayload
 
 password_hasher = PasswordHash.recommended()
 

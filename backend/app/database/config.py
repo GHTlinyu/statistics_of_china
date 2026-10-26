@@ -1,5 +1,11 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
+
+# 仓库根目录（backend/app/database/config.py -> backend/app/database -> backend -> 仓库根）。
+# .env 固定在仓库根，避免工作目录不同导致找不到配置。
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -12,7 +18,7 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 1440
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=REPO_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )

@@ -4,8 +4,8 @@
     uv run python -m app.database.init_db
 """
 
-from app.database.database import Base, engine
-from app.model.user import User  # noqa: F401  确保模型注册到 Base.metadata
+from backend.app.database.database import Base, engine
+from backend.app.model.user import User  # noqa: F401  确保模型注册到 Base.metadata
 
 
 def create_tables() -> None:

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.mapper.userMapper import UserMapper
-from app.model.user import User
+from backend.app.mapper.userMapper import UserMapper
+from backend.app.model.user import User
 
 
 class UserService:

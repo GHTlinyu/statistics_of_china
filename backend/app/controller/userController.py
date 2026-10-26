@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database.database import get_db
-from app.schema.responseDTO import ApiResponse
-from app.schema.userDTO import UserDTO
-from app.service.userService import UserService
+from backend.app.database.database import get_db
+from backend.app.schema.responseDTO import ApiResponse
+from backend.app.schema.userDTO import UserDTO
+from backend.app.service.userService import UserService
 
 router = APIRouter(
     prefix="/user",

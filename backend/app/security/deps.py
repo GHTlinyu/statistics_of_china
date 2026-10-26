@@ -5,8 +5,8 @@ from typing import Annotated
 import jwt
 from fastapi import Header, HTTPException, Request, status
 
-from app.schema.authDTO import TokenPayload
-from app.security.security import decode_access_token
+from backend.app.schema.authDTO import TokenPayload
+from backend.app.security.security import decode_access_token
 
 # 免鉴权的公开路径；其余所有接口默认要求携带 Bearer token
 PUBLIC_PATHS: frozenset[str] = frozenset(

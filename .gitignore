@@ -16,6 +16,9 @@ wheels/
 # Secrets
 .env
 
+# Frontend (Node.js)
+node_modules/
+
 # Claude Code
 .claude/skills/
 .claude/settings.local.json

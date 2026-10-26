@@ -3,19 +3,19 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.database.config import settings
-from app.database.database import get_db
-from app.schema.authDTO import (
+from backend.app.database.config import settings
+from backend.app.database.database import get_db
+from backend.app.schema.authDTO import (
     LoginRequest,
     RegisterRequest,
     TokenPayload,
     TokenResponse,
 )
-from app.schema.responseDTO import ApiResponse
-from app.schema.userDTO import UserDTO
-from app.security.deps import get_current_user
-from app.security.security import create_access_token
-from app.service.authService import AuthService
+from backend.app.schema.responseDTO import ApiResponse
+from backend.app.schema.userDTO import UserDTO
+from backend.app.security.deps import get_current_user
+from backend.app.security.security import create_access_token
+from backend.app.service.authService import AuthService
 
 router = APIRouter(
     prefix="/auth",

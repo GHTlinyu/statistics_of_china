@@ -11,7 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.database import Base
+from backend.app.database.database import Base
 
 
 class User(Base):
