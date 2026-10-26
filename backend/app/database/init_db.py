@@ -5,6 +5,8 @@
 """
 
 from backend.app.database.database import Base, engine
+from backend.app.model.conversation import Conversation  # noqa: F401
+from backend.app.model.message import Message  # noqa: F401
 from backend.app.model.user import User  # noqa: F401  确保模型注册到 Base.metadata
 
 
