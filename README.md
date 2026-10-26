@@ -21,4 +21,13 @@ uv run uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 # 前端（frontend/）
 
-- 待建设
+- 技术栈：Umi Max（umi 4）+ React + antd + TypeScript
+- 依赖管理：pnpm workspace（根目录 `pnpm install`；Node 由 fnm 管理）
+- 开发服务器（在仓库根目录执行）：
+
+```bash
+pnpm dev   # http://localhost:8001，/api 请求自动代理到后端 8000
+```
+
+- 生产构建：`pnpm build`
+- 登录页对接 `POST /auth/login`；token 存 localStorage，请求自动携带（见 `frontend/src/app.tsx`）
