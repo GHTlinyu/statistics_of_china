@@ -70,10 +70,18 @@ score = 1 - (summary_embedding <=> :vector)
 ```
 POST {LLM_EMBEDDING_BASE_URL}/embeddings
 Authorization: Bearer <key>
-{"model": "...", "input": ["..."], "task": "retrieval.query" | "retrieval.passage"}
+{
+  "model": "jina-embeddings-v5-text-small",
+  "task": "retrieval.query" | "retrieval.passage",
+  "normalized": true,
+  "input": [{"text": "..."}]
+}
 → {"data": [{"index": 0, "embedding": [0.1, ...]}, ...]}
 ```
 
+- `input` 是对象数组（支持 `{text}` / `{image}`），当前只用文本。
+- 固定 `normalized=true`，与入库向量口径一致。
+- 模型必须与入库向量一致（当前库按 `jina-embeddings-v5-text-small` 生成）；换模型必须重新入库。
 - 按 `LLM_EMBEDDING_BATCH_SIZE`（默认 32）分批请求。
 - 返回条数或单条维度不符，抛 `EmbeddingError`。
 
@@ -81,7 +89,13 @@ Authorization: Bearer <key>
 
 ```
 POST {LLM_RERANK_BASE_URL}/rerank
-{"model": "...", "query": "...", "documents": ["..."], "top_n": 5}
+{
+  "model": "jina-reranker-v3.5",
+  "query": "...",
+  "documents": ["..."],
+  "top_n": 5,
+  "return_documents": false
+}
 → {"results": [{"index": 2, "relevance_score": 0.93}, ...]}
 ```
 
@@ -93,19 +107,19 @@ POST {LLM_RERANK_BASE_URL}/rerank
 | 变量 | 必填 | 默认 |
 | --- | --- | --- |
 | LLM_EMBEDDING_API_KEY | 是 | — |
-| LLM_EMBEDDING_BASE_URL | 是 | — |
-| LLM_EMBEDDING_MODEL | 是 | — |
+| LLM_EMBEDDING_BASE_URL | 否 | https://api.jina.ai/v1 |
+| LLM_EMBEDDING_MODEL | 是 | —（须与入库向量一致） |
 | LLM_EMBEDDING_DIMENSIONS | 否 | 1024 |
 | LLM_EMBEDDING_TASK_QUERY | 否 | retrieval.query |
 | LLM_EMBEDDING_TASK_DOCUMENT | 否 | retrieval.passage |
 | LLM_EMBEDDING_BATCH_SIZE | 否 | 32 |
 | LLM_RERANK_API_KEY | 否 | 复用 embedding key |
 | LLM_RERANK_BASE_URL | 否 | 复用 embedding base_url |
-| LLM_RERANK_MODEL | 否 | jina-reranker-v2-base-multilingual |
+| LLM_RERANK_MODEL | 否 | jina-reranker-v3.5 |
 | RAG_TIMEOUT_SECONDS | 否 | 30 |
 | RAG_MAX_RETRIES | 否 | 2 |
 
-配置在模块导入时通过 `load_dotenv(仓库根/.env)` 加载；校验集中在 `load_retrieval_config()`，缺失项一次性列出。
+配置在模块导入时通过 `load_dotenv(仓库根/.env)` 加载；`LLM_EMBEDDING_API_KEY` 与 `LLM_EMBEDDING_MODEL` 必填，其余有默认值或被复用。
 
 ## 接口定义
 

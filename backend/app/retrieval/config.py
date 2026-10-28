@@ -1,6 +1,6 @@
 """检索与重排配置：从仓库根目录的 `.env` 读取。
 
-只读 embedding / rerank 相关的 `LLM_*` 与 `RAG_*`，不碰数据库配置。
+只读 embedding / rerank 相关的 `LLM_*` 与 `RAG_*`，不碰数据库与 LLM 聊天配置。
 """
 
 import os
@@ -18,13 +18,15 @@ ENV_FILE = REPO_ROOT / ".env"
 
 load_dotenv(ENV_FILE)
 
+DEFAULT_BASE_URL = "https://api.jina.ai/v1"
+DEFAULT_RERANK_MODEL = "jina-reranker-v3.5"
+
 DEFAULT_DIMENSIONS = 1024
 DEFAULT_BATCH_SIZE = 32
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_TASK_QUERY = "retrieval.query"
 DEFAULT_TASK_DOCUMENT = "retrieval.passage"
-DEFAULT_RERANK_MODEL = "jina-reranker-v2-base-multilingual"
 
 
 @dataclass(frozen=True)
@@ -72,32 +74,30 @@ def _read_float(key: str, default: float) -> float:
 
 
 def load_retrieval_config() -> RetrievalConfig:
-    """读取并校验检索配置，缺必填项时一次性报出所有缺失项。"""
+    """读取并校验检索配置。
+
+    embedding 模型必须显式配置，且要与入库向量的模型一致，否则相似度没有意义。
+    """
     api_key = _read_text("LLM_EMBEDDING_API_KEY")
-    base_url = _read_text("LLM_EMBEDDING_BASE_URL")
     model = _read_text("LLM_EMBEDDING_MODEL")
 
     missing = [
         name
         for name, value in (
             ("LLM_EMBEDDING_API_KEY", api_key),
-            ("LLM_EMBEDDING_BASE_URL", base_url),
             ("LLM_EMBEDDING_MODEL", model),
         )
         if value is None
     ]
     if missing:
         raise RagConfigurationError(
-            "缺少向量检索配置："
-            + "、".join(missing)
-            + "，请在仓库根目录的 .env 中填写"
+            "缺少向量检索配置：" + "、".join(missing) + "，请在仓库根目录的 .env 中填写"
         )
 
-    api_key = cast(str, api_key)
-    base_url = cast(str, base_url)
+    base_url = _read_text("LLM_EMBEDDING_BASE_URL") or DEFAULT_BASE_URL
 
     return RetrievalConfig(
-        embedding_api_key=api_key,
+        embedding_api_key=cast(str, api_key),
         embedding_base_url=base_url,
         embedding_model=cast(str, model),
         embedding_dimensions=_read_int("LLM_EMBEDDING_DIMENSIONS", DEFAULT_DIMENSIONS),
@@ -106,7 +106,7 @@ def load_retrieval_config() -> RetrievalConfig:
         embedding_task_document=_read_text("LLM_EMBEDDING_TASK_DOCUMENT")
         or DEFAULT_TASK_DOCUMENT,
         embedding_batch_size=_read_int("LLM_EMBEDDING_BATCH_SIZE", DEFAULT_BATCH_SIZE),
-        rerank_api_key=_read_text("LLM_RERANK_API_KEY") or api_key,
+        rerank_api_key=_read_text("LLM_RERANK_API_KEY") or cast(str, api_key),
         rerank_base_url=_read_text("LLM_RERANK_BASE_URL") or base_url,
         rerank_model=_read_text("LLM_RERANK_MODEL") or DEFAULT_RERANK_MODEL,
         timeout=_read_float("RAG_TIMEOUT_SECONDS", DEFAULT_TIMEOUT),

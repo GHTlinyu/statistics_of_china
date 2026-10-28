@@ -37,6 +37,7 @@ class Reranker:
                 "query": query,
                 "documents": documents,
                 "top_n": limit,
+                "return_documents": False,
             },
             api_key=self._config.rerank_api_key,
             timeout=self._config.timeout,

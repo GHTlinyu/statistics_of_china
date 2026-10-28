@@ -1,7 +1,7 @@
-from langgraph.graph import START, END, StateGraph
+from langgraph.graph import END, START, StateGraph
 
-from agent.nodes import generate_node, retrieve_node
-from agent.state import AgentState
+from backend.agent.workflow.nodes import generate_node, retrieve_node
+from backend.agent.workflow.state import AgentState
 
 
 def create_graph():

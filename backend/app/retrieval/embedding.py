@@ -52,8 +52,11 @@ class EmbeddingClient:
                 self._url,
                 {
                     "model": self._config.embedding_model,
-                    "input": batch,
                     "task": task,
+                    "normalized": True,
+                    # Jina v5 的 input 是对象数组（支持 {text} / {image}），
+                    # 这里只用文本
+                    "input": [{"text": text} for text in batch],
                 },
                 api_key=self._config.embedding_api_key,
                 timeout=self._config.timeout,

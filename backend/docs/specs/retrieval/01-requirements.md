@@ -15,13 +15,13 @@ RAG 知识库数据已入库：`document_chunks` 保存分块正文，`chunk_ret
 | 编号 | 需求 | 说明 |
 | --- | --- | --- |
 | R1 | 检索主表 | `chunk_retrieval`：`chunk_id`、`title`、`title_embedding VECTOR(1024)`、`summary`、`summary_embedding VECTOR(1024)`、`created_at`、`updated_at`。 |
-| R2 | 向量接口 | OpenAI 兼容的 `POST /embeddings`，模型 `jinaai/jina-embeddings-v5-text-small`，1024 维。 |
+| R2 | 向量接口 | Jina `POST /embeddings`，模型 `jina-embeddings-v5-omni-small`，1024 维；`input` 为 `{text}` 对象数组，`normalized=true`。 |
 | R3 | 任务区分 | 查询用 query 任务，入库用 document 任务（Jina：`retrieval.query` / `retrieval.passage`）。 |
 | R4 | summary 召回 | 只用 `summary_embedding` 计算余弦相似度召回；`title` 不参与检索打分。没有 summary 向量的分块不参与召回。 |
-| R5 | 重排 | 调用 Jina Rerank 接口对候选片段重新打分排序。 |
+| R5 | 重排 | 调用 Jina `POST /rerank`（`jina-reranker-v3.5`）对候选片段重新打分排序，`return_documents=false`。 |
 | R6 | 正文回表 | 以 `chunk_id` 关联 `document_chunks.content` 取片段正文。 |
 | R7 | tool 化 | 暴露 `search_yearbook(query, top_k=5)`，返回 JSON 字符串（正文完整返回，不截断），供 Agent 调用。 |
-| R8 | 配置 | `.env` 提供 `LLM_EMBEDDING_*` 与 `LLM_RERANK_*`；缺失时给出明确报错。 |
+| R8 | 配置 | `.env` 提供 `LLM_EMBEDDING_*` 与 `LLM_RERANK_*`；API key 与 embedding 模型必填（模型须与入库向量一致），其余有默认值。 |
 | R9 | 降级 | 重排失败退回向量排序；embedding 失败视为检索失败并抛错。 |
 | R10 | 维度校验 | 返回向量必须为 1024 维，否则报错。 |
 | R11 | 同步 | 检索链路为同步实现，是否放入线程池由调用方决定。 |

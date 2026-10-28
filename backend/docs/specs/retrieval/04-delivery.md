@@ -26,7 +26,8 @@
 | 场景 | 结果 |
 | --- | --- |
 | ORM 编译 DDL | `VECTOR(1024)` ×2、`GENERATED ALWAYS AS IDENTITY`、时间戳默认值正确 |
-| 缺配置 | 一次性列出 `LLM_EMBEDDING_*` 三项 |
+| 缺 key | 报错 `缺少向量检索配置：LLM_EMBEDDING_API_KEY` |
+| Jina 请求体 | embedding：`input` 为 `[{text}]`、`normalized=true`；rerank：`return_documents=false` |
 | query / document 任务 | 分别发送 `retrieval.query`、`retrieval.passage` |
 | 分批 | batch=2 时 5 条按 2 / 2 / 1 拆分 |
 | 维度校验 | 返回 768 维时报错 |
@@ -50,10 +51,10 @@
 
 ## 待办与已知偏差
 
-1. `.env` 的 embedding 三项为空，真实模型调用未验证。
+1. `.env` 的 `LLM_EMBEDDING_API_KEY` 仍为空，真实模型调用未验证。
 2. `chunk_retrieval` 有 282 条「备注」块没有 `summary_embedding`（正文约 30 字），按当前设计不参与召回；若需覆盖表注，需补 summary 向量。
-3. `workflow/nodes.py` 仍引用 `rag.embedding` / `rag.retriever`，未接线（本轮约定不改业务逻辑）。
-4. rerank 默认模型名 `jina-reranker-v2-base-multilingual` 需按账号实际可用模型确认。
+3. 检索已通过 `search_yearbook` tool 接入工作流（`workflow/nodes.py`）。
+4. 默认 rerank 模型 `jina-reranker-v3.5` 需与账号可用模型一致；embedding 模型必须与入库一致（按入库说明记为 `jina-embeddings-v5-text-small`，若实际为 omni-small 需改配置）。
 5. 召回 `20`、最终 `5` 为默认值，待真实向量联调后复核。
 6. 两表 `chunk_id` 与向量列均无索引（本期约定不建）；1229 行下全表扫描耗时可接受。
 
@@ -61,9 +62,10 @@
 
 ```ini
 LLM_EMBEDDING_API_KEY=...
-LLM_EMBEDDING_BASE_URL=https://api.jina.ai/v1
-LLM_EMBEDDING_MODEL=jina-embeddings-v5-text-small
-LLM_RERANK_MODEL=...
+LLM_EMBEDDING_MODEL=jina-embeddings-v5-text-small   # 必须与入库向量一致
+# 以下有默认值，可按需覆盖
+# LLM_EMBEDDING_BASE_URL=https://api.jina.ai/v1
+# LLM_RERANK_MODEL=jina-reranker-v3.5
 ```
 
 ## 联调步骤（数据库与凭据就绪后）

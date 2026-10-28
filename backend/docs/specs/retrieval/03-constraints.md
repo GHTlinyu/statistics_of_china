@@ -11,7 +11,7 @@
 ## 配置约束
 
 - 用 `load_dotenv` + `os.getenv` 读取仓库根目录 `.env`，不引入 pydantic-settings，不修改 `backend/app/database/config.py`。
-- 新增配置项必须有默认值或明确报错；缺项报错需一次性列出全部缺失项。
+- `LLM_EMBEDDING_API_KEY` 与 `LLM_EMBEDDING_MODEL` 必填；embedding 模型须与入库向量一致，换模型必须重新入库；其余配置有默认值。
 - 密钥只经环境变量传递，不写入代码、日志与文档。
 
 ## 依赖约束
@@ -30,6 +30,7 @@
 ## 行为约束
 
 - 检索链路同步实现；异步场景由调用方放入线程池或包装，不在模块内起线程。
+- embedding 请求固定 `normalized=true`、`input` 用 `{text}` 对象数组；rerank 请求带 `return_documents=false`。
 - 重排失败必须降级为向量排序并记录 warning；embedding 失败才允许向上抛错。
 - tool 返回完整正文，不做截断；上下文长度由调用方按模型窗口控制。
 - 召回数与最终条数使用命名常量，便于后续评测调整。
