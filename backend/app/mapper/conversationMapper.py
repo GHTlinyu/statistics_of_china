@@ -63,6 +63,36 @@ class ConversationMapper:
         return conversation
 
     @staticmethod
+    def update_title(
+        db: Session,
+        conversation_id: int,
+        title: str,
+    ) -> None:
+        stmt = (
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(title=title)
+        )
+
+        db.execute(stmt)
+        db.commit()
+
+    @staticmethod
+    def touch(
+        db: Session,
+        conversation_id: int,
+    ) -> None:
+        """刷新会话的 updated_at，让列表按最近活跃排序。"""
+        stmt = (
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(updated_at=func.now())
+        )
+
+        db.execute(stmt)
+        db.commit()
+
+    @staticmethod
     def soft_delete(
         db: Session,
         conversation_id: int,

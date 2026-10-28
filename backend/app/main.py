@@ -2,9 +2,11 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from backend.app.controller.authController import router as auth_router
+from backend.app.controller.chatController import router as chat_router
 from backend.app.controller.conversationController import (
     router as conversation_router,
 )
+from backend.app.controller.messageController import router as message_router
 from backend.app.controller.userController import router as user_router
 from backend.app.schema.responseDTO import ApiResponse
 from backend.app.security.deps import get_current_user
@@ -18,6 +20,8 @@ app = FastAPI(
 app.include_router(user_router)
 app.include_router(auth_router)
 app.include_router(conversation_router)
+app.include_router(chat_router)
+app.include_router(message_router)
 
 
 @app.get("/health")

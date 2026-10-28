@@ -1,9 +1,11 @@
 """Agent 工作流节点：检索 → 生成。"""
 
+import asyncio
 import json
 import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.config import get_stream_writer
 
 from backend.agent.client import get_llm
 from backend.agent.tools import search_yearbook
@@ -62,10 +64,14 @@ def format_documents(documents: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-def retrieve_node(state: AgentState) -> dict:
+async def retrieve_node(state: AgentState) -> dict:
     question = state["question"]
 
-    raw = search_yearbook.invoke({"query": question, "top_k": RETRIEVE_TOP_N})
+    # 工具是同步实现（DB + 外部接口），放到线程里跑，避免阻塞事件循环
+    raw = await asyncio.to_thread(
+        search_yearbook.invoke,
+        {"query": question, "top_k": RETRIEVE_TOP_N},
+    )
     documents = json.loads(raw)
 
     logger.info("检索完成：question=%r，命中 %d 条", question, len(documents))
@@ -73,7 +79,7 @@ def retrieve_node(state: AgentState) -> dict:
     return {"documents": documents}
 
 
-def generate_node(state: AgentState) -> dict:
+async def generate_node(state: AgentState) -> dict:
     question = state["question"]
     documents = state.get("documents") or []
     history = state.get("history") or []
@@ -105,7 +111,7 @@ def generate_node(state: AgentState) -> dict:
 1. user 类型用于理解用户长期偏好、习惯和关注方向。
 2. feedback 类型是用户对回答方式的长期指导，应在当前场景适用时遵守。
 3. 长期记忆不是统计事实来源，不允许根据长期记忆编造统计数据。
-4. 如果长期记忆与用户当前明确要求冲突，以当前用户要求为准。
+4. 如果长期记忆与当前用户明确要求冲突，以当前用户要求为准。
 """
 
     messages = [
@@ -114,6 +120,14 @@ def generate_node(state: AgentState) -> dict:
         HumanMessage(content=question),
     ]
 
-    answer = get_llm().chat(messages)
+    # 逐块流式生成，同时通过 LangGraph 的 custom 流把 token 交给上层
+    writer = get_stream_writer()
+    parts: list[str] = []
 
-    return {"answer": answer}
+    async for piece in get_llm().astream(messages):
+        if not piece:
+            continue
+        parts.append(piece)
+        writer({"content": piece})
+
+    return {"answer": "".join(parts)}
