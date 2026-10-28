@@ -1,0 +1,63 @@
+from datetime import datetime
+
+from sqlalchemy import BigInteger, DateTime, String, Text, text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from backend.app.database.database import Base
+
+
+class Memory(Base):
+    """用户记忆。
+
+    与 agent 的集成方式（写入时机、检索方式）尚未确定，此处只落表结构。
+    """
+
+    __tablename__ = "memory"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+
+    memory_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    title: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    source_conversation_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+        onupdate=text("CURRENT_TIMESTAMP"),
+    )
