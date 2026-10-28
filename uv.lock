@@ -1249,6 +1249,7 @@ version = "0.1.1"
 source = { virtual = "backend" }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "pgvector" },
@@ -1264,6 +1265,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "langchain-openai", specifier = ">=1.0.0" },
     { name = "langgraph", specifier = ">=1.2.11" },
     { name = "pgvector", specifier = ">=0.5.0" },
