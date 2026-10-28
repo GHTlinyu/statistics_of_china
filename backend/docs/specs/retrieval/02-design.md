@@ -100,6 +100,7 @@ POST {LLM_RERANK_BASE_URL}/rerank
 ```
 
 - 兼容 `results` / `data` 两种字段名，`relevance_score` / `score` 两种分数字段。
+- `relevance_score` 是原始分数（可能为负），只用于排序，不作为概率展示。
 - 越界下标与缺字段的条目被忽略；无有效结果抛 `RerankError`。
 
 ## 配置项

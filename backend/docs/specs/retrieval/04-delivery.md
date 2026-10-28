@@ -2,7 +2,7 @@
 
 - 功能 slug：`retrieval`
 - 日期：2026-10-28
-- 状态：已实现；数据库链路已实测（含 summary-only 复核），真实模型调用待凭据
+- 状态：已实现；向量、重排、数据库、LLM 问答链路均已真实联调
 
 ## 改动清单
 
@@ -49,9 +49,21 @@
 | 召回范围 | `summary_embedding` 非空 947/1229；实测召回恰为 947 条，全部带 summary |
 | 正文完整性 | 最长分块 16717 字，回表返回完整内容，未截断 |
 
+## 真实接口联调（2026-10-28）
+
+| 项 | 结果 |
+| --- | --- |
+| embedding（query） | 1024 维，模长 1.0（`normalized` 生效），单次约 0.5s |
+| embedding（document） | 3 条批量约 0.67s，1024 维 |
+| 模型一致性 | 库里 summary 用 document 任务重算，与存储向量余弦 0.999928（模型、task 完全一致） |
+| rerank | 约 0.64s，`jina-reranker-v3.5`；分数为原始 logit（可能为负），仅用于排序 |
+| tool 端到端 | 「2024 年全国人口」1.59s、「分地区固定资产投资」1.31s，top5 命中对应统计表 |
+| 工作流接入 | `graph.invoke` 真实检索 1.53s，5 条文档进入 prompt |
+| 问答链路 | 「近几年的人口结构变化是如何的」：检索 1.54s + 生成 10.19s，回答 1203 字，18 个关键数字均可在召回原文中找到 |
+
 ## 待办与已知偏差
 
-1. `.env` 的 `LLM_EMBEDDING_API_KEY` 仍为空，真实模型调用未验证。
+1. 回答生成约 10s（非流式），后续接前端时建议改流式输出。
 2. `chunk_retrieval` 有 282 条「备注」块没有 `summary_embedding`（正文约 30 字），按当前设计不参与召回；若需覆盖表注，需补 summary 向量。
 3. 检索已通过 `search_yearbook` tool 接入工作流（`workflow/nodes.py`）。
 4. 默认 rerank 模型 `jina-reranker-v3.5` 需与账号可用模型一致；embedding 模型必须与入库一致（按入库说明记为 `jina-embeddings-v5-text-small`，若实际为 omni-small 需改配置）。
