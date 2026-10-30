@@ -14,6 +14,10 @@ WORKDIR /app
 COPY .npmrc pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY frontend/ frontend/
 
+RUN pnpm --version \
+    && pnpm config get onlyBuiltDependencies \
+    && cat pnpm-workspace.yaml
+
 RUN pnpm install --frozen-lockfile \
     && pnpm build
 
