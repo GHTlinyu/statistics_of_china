@@ -60,11 +60,11 @@ jobs:
           docker save soc-nginx:latest | gzip -1 > soc-nginx.tar.gz
           ls -lh *.tar.gz
 
-      - name: 上传镜像到服务器
+      - name: 上传镜像与部署文件到服务器
         timeout-minutes: 30
         run: |
           echo "[upload] $(date -u '+%H:%M:%S') 本地待传文件："
-          ls -lh soc-backend.tar.gz soc-nginx.tar.gz
+          ls -lh soc-backend.tar.gz soc-nginx.tar.gz deploy/docker-compose.yml
 
           echo "[upload] $(date -u '+%H:%M:%S') 准备服务器目录 /tmp/soc-deploy"
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
@@ -86,25 +86,34 @@ jobs:
             "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:/tmp/soc-deploy/"
           echo "[upload] $(date -u '+%H:%M:%S') soc-nginx.tar.gz 上传完成"
 
-          echo "[upload] 服务器端文件大小校验（应与上面 ls -lh 一致）："
+          echo "[upload] $(date -u '+%H:%M:%S') 开始上传 docker-compose.yml"
+          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 \
+            deploy/docker-compose.yml \
+            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:/tmp/soc-deploy/"
+          echo "[upload] $(date -u '+%H:%M:%S') docker-compose.yml 上传完成"
+
+          echo "[upload] 服务器端文件校验（应与上面 ls -lh 一致）："
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 -o ServerAliveInterval=30 \
             "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" \
             "ls -lh /tmp/soc-deploy/ && du -sb /tmp/soc-deploy/"
 
-      - name: 服务器同步部署文件
+      - name: 服务器放置部署文件
         run: |
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
             "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" 'bash -s' <<'REMOTE'
           set -euo pipefail
           trap 'echo "[deploy] 失败：第 $LINENO 行，退出码 $?"' ERR
 
-          echo "[deploy][1/4] 进入部署目录 /opt/statistics_of_china"
-          cd /opt/statistics_of_china
+          echo "[deploy][1/4] 准备部署目录 /opt/statistics_of_china/deploy"
+          mkdir -p /opt/statistics_of_china/deploy
 
-          echo "[deploy][2/4] git pull 开始"
-          git pull --ff-only
-          echo "[deploy][2/4] git pull 完成，当前提交：$(git rev-parse --short HEAD)"
+          echo "[deploy][2/4] 覆盖 docker-compose.yml（服务器不再依赖 git）"
+          cp /tmp/soc-deploy/docker-compose.yml \
+            /opt/statistics_of_china/deploy/docker-compose.yml
+          echo "[deploy][2/4] 部署文件就位："
+          ls -lh /opt/statistics_of_china/deploy/
           REMOTE
 
       - name: 服务器加载新镜像
