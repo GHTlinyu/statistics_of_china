@@ -22,10 +22,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # v7 起使用 Node 24 运行时（v4 的 Node 20 已被 GitHub Actions 弃用）
+      - uses: actions/checkout@v7.0.1
 
       - name: 安装 uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.12"
 
@@ -39,7 +40,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: 配置 SSH
         run: |
@@ -60,13 +61,36 @@ jobs:
           ls -lh *.tar.gz
 
       - name: 上传镜像到服务器
+        timeout-minutes: 30
         run: |
+          echo "[upload] $(date -u '+%H:%M:%S') 本地待传文件："
+          ls -lh soc-backend.tar.gz soc-nginx.tar.gz
+
+          echo "[upload] $(date -u '+%H:%M:%S') 准备服务器目录 /tmp/soc-deploy"
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 \
             "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" \
             "mkdir -p /tmp/soc-deploy"
-          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
-            soc-backend.tar.gz soc-nginx.tar.gz \
+
+          echo "[upload] $(date -u '+%H:%M:%S') 开始上传 soc-backend.tar.gz（可查看 -v 输出确认在传输）"
+          scp -v -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 \
+            soc-backend.tar.gz \
             "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:/tmp/soc-deploy/"
+          echo "[upload] $(date -u '+%H:%M:%S') soc-backend.tar.gz 上传完成"
+
+          echo "[upload] $(date -u '+%H:%M:%S') 开始上传 soc-nginx.tar.gz"
+          scp -v -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 \
+            soc-nginx.tar.gz \
+            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:/tmp/soc-deploy/"
+          echo "[upload] $(date -u '+%H:%M:%S') soc-nginx.tar.gz 上传完成"
+
+          echo "[upload] 服务器端文件大小校验（应与上面 ls -lh 一致）："
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 \
+            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" \
+            "ls -lh /tmp/soc-deploy/ && du -sb /tmp/soc-deploy/"
 
       - name: 服务器同步部署文件
         run: |
