@@ -14,6 +14,9 @@ services:
     build:
       context: ..
       dockerfile: deploy/backend/Dockerfile
+    # 镜像名必须与 CI 构建/load 的 tag 一致（soc-backend:latest），
+    # 不写 image 时 compose 会按项目目录名自动推导成 deploy-backend:latest
+    image: soc-backend:latest
     env_file: .env.docker
     network_mode: host
     restart: unless-stopped
@@ -34,6 +37,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/nginx/Dockerfile
+    image: soc-nginx:latest
     network_mode: host
     depends_on:
       - backend

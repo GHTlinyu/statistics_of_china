@@ -95,15 +95,19 @@ pg_restore -h 127.0.0.1 -p 5432 -U postgres -d <db_name> -v soc-backup.dump
 - 若此前库里已有同名表导致恢复报错，先 `dropdb <db_name> && createdb <db_name>` 再恢复。
 - 本地没有单独设置 `captcha` 表的话（表在第一次 init_db 时已建），以 `\dt` 实际结果为准；`entrypoint.sh` 会幂等补建缺的表。
 
-## 4. 构建与启动
+## 4. 首次启动（走 CI）
+
+服务器上**没有代码仓库**（部署文件由 CI 直接上传），所以不能在服务器本地 `--build`。首次启动两种方式：
+
+**方式 A：CI 部署（推荐）**——服务器就绪后（目录、`.env.docker`、数据恢复完成），push 一次代码触发流水线，CI 完成构建 → 上传 → load → 启动，全程无需服务器操作。
+
+**方式 B：手动 load（CI 不可用时）**——按 8.4 节把镜像 tar 与 compose 文件传上来后：
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d --build
+gunzip -c /tmp/soc-deploy/soc-backend.tar.gz | docker load
+gunzip -c /tmp/soc-deploy/soc-nginx.tar.gz | docker load
+cd /opt/statistics_of_china && docker compose -f deploy/docker-compose.yml up -d --no-build
 ```
-
-首次构建会拉取基础镜像并安装依赖，需要几分钟；之后普通重启 `docker compose -f deploy/docker-compose.yml up -d` 即可。
-
-**国内服务器加速（可选）**：构建拉取 `python:3.12-slim` / `node:22-alpine` / `nginx:1.27-alpine` 都走 Docker Hub，建议先配置 registry 加速器（阿里云/腾讯云都有免费加速地址，写入 `/etc/docker/daemon.json` 后 `systemctl restart docker`）；构建容器内 pip / pnpm 下载依赖慢时，按 `deploy/backend/Dockerfile` 与 `deploy/nginx/Dockerfile` 中的注释切换国内镜像源。
 
 查看状态：
 
@@ -115,20 +119,20 @@ docker compose -f deploy/docker-compose.yml logs -f backend
 ## 5. 启动验证清单（服务器执行）
 
 ```bash
-# 1. nginx 直接服务静态首页
-curl -s http://127.0.0.1/ | head -20
+# 1. 健康检查（经 nginx 反代，公开接口，无需 token）
+curl -s https://creative-idea-generator.site/api/health
 
-# 2. /api 反代 → 后端健康检查（公开接口，无需 token）
-curl -s http://127.0.0.1/api/health
+# 2. HTTP 应 301 跳转 HTTPS
+curl -I http://creative-idea-generator.site/
 
-# 3. 验证码接口（公开）
-curl -s http://127.0.0.1/api/auth/captcha | head -c 200
+# 3. 验证码接口（公开，确认后端连通）
+curl -s https://creative-idea-generator.site/api/auth/captcha | head -c 200
 
 # 4. 容器状态：两个服务都是 running / healthy
 docker compose -f deploy/docker-compose.yml ps
 ```
 
-然后浏览器访问 `http://<服务器IP>/`：登录页应正常显示验证码图片；登录后应能创建会话并**流式**收到聊天回答（token 逐字出现说明 SSE 反代正常）。
+然后浏览器访问 `https://creative-idea-generator.site/`：登录页应正常显示验证码图片；登录后应能创建会话并**流式**收到聊天回答（token 逐字出现说明 SSE 反代正常）。
 
 ## 6. 数据备份（服务器，crontab）
 
