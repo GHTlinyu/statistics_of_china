@@ -21,6 +21,7 @@ htmlcov/
 
 # Secrets
 .env
+deploy/.env.docker
 
 # Frontend (Node.js)
 node_modules/

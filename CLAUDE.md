@@ -33,6 +33,7 @@ pnpm build                                              # 前端生产构建
 | `backend/rag/` | 知识库数据与设计文档，详见 `backend/rag/docs/README.md` |
 | `backend/docs/specs/` | 功能开发全链路文档，见 `backend/docs/specs/README.md` |
 | `frontend/` | 前端项目（@umijs/max + antd）：`.umirc.ts`（路由/代理）、`src/app.tsx`（全局请求封装）、`src/pages/`（页面） |
+| `deploy/` | 生产部署文件：compose、后端/nginx Dockerfile、entrypoint、`.env.docker.example`，手册见 `deploy/README.md` |
 | `.agent/skills/` | 项目 Agent Skills 源文件 |
 | `scripts/` | 开发辅助脚本 |
 | `.env` | 仓库根目录的密钥配置（数据库与 LLM），后端经锚定路径读取 |
