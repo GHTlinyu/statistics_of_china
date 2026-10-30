@@ -13,6 +13,12 @@ wheels/
 # uv cache
 .uv-cache
 
+# Test artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
 # Secrets
 .env
 

@@ -21,3 +21,19 @@ dependencies = [
     "sqlalchemy>=2.0.52",
     "uvicorn>=0.52.3",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore:.*CallSpec2.*:pytest.PytestRemovedIn10Warning",
+]

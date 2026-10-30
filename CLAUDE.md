@@ -10,6 +10,7 @@
 uv sync --all-packages                                   # 安装/同步所有 workspace 成员依赖
 uv run uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000   # 启动 API 服务
 uv run python -m backend.app.database.init_db            # 初始化数据库表
+uv run --package statistics-of-china-backend pytest backend/tests   # 运行后端单元测试
 uv run python scripts/setup_agent_skills.py              # 建立 .claude/skills 联接
 ```
 

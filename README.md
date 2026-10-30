@@ -12,6 +12,7 @@ uv run uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 - 数据库初始化：`uv run python -m backend.app.database.init_db`
+- 单元测试：`uv run --package statistics-of-china-backend pytest backend/tests`（详见 `backend/tests/README.md`）
 - 配置：仓库根目录 `.env`
 
 # RAG部分
