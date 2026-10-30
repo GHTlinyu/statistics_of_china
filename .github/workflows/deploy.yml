@@ -1,0 +1,98 @@
+# 生产部署流水线：测试 → 构建镜像 → 传服务器 → 加载启动
+#
+# 模式：GitHub runner 构建镜像，docker save 后 scp 上传，服务器 docker load 后 compose up。
+# 不需要任何镜像仓库。
+#
+# 依赖的 GitHub Secrets（与 SSH 连接测试一致）：
+#   ECS_SSH_PRIVATE_KEY   部署专用私钥（服务器对应用户的 ~/.ssh/authorized_keys 已放公钥）
+#   ECS_USER              部署用户
+#   ECS_HOST              服务器 IP 或域名
+#
+# 触发：push 到 master 自动部署；也可在 Actions 页面手动 workflow_dispatch。
+# 只想手动部署时，注释掉下面的 push 块。
+
+name: deploy
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: uv sync --all-packages
+
+      - name: 运行单元测试
+        run: uv run --package statistics-of-china-backend pytest backend/tests -q
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.ECS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: 构建后端镜像
+        run: docker build -f deploy/backend/Dockerfile -t soc-backend:latest .
+
+      - name: 构建前端 + nginx 镜像
+        run: docker build -f deploy/nginx/Dockerfile -t soc-nginx:latest .
+
+      - name: 导出镜像（gzip 打包，压缩速度优先）
+        run: |
+          docker save soc-backend:latest | gzip -1 > soc-backend.tar.gz
+          docker save soc-nginx:latest | gzip -1 > soc-nginx.tar.gz
+          ls -lh *.tar.gz
+
+      - name: 上传镜像到服务器
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" \
+            "mkdir -p /tmp/soc-deploy"
+          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            soc-backend.tar.gz soc-nginx.tar.gz \
+            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:/tmp/soc-deploy/"
+
+      - name: 服务器加载镜像并重启服务
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" 'bash -s' <<'REMOTE'
+          set -e
+          cd /opt/statistics_of_china
+
+          echo "[deploy] git pull（部署文件同步）"
+          git pull --ff-only
+
+          echo "[deploy] 保留上一版镜像用于回滚"
+          docker tag soc-backend:latest soc-backend:previous 2>/dev/null || true
+          docker tag soc-nginx:latest soc-nginx:previous 2>/dev/null || true
+
+          echo "[deploy] docker load"
+          gunzip -c /tmp/soc-deploy/soc-backend.tar.gz | docker load
+          gunzip -c /tmp/soc-deploy/soc-nginx.tar.gz | docker load
+
+          echo "[deploy] compose up"
+          docker compose -f deploy/docker-compose.yml up -d --no-build
+
+          echo "[deploy] 清理临时文件与悬空镜像"
+          rm -rf /tmp/soc-deploy
+          docker image prune -f
+
+          echo "[deploy] 状态："
+          docker compose -f deploy/docker-compose.yml ps
+          REMOTE

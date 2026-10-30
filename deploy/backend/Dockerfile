@@ -1,8 +1,9 @@
 # 后端镜像：uv 多阶段构建（依赖层缓存 + 精简运行时）
 #
 # 构建上下文必须是仓库根目录（compose 里已配置 context: ..）。
-# 运行时工作目录固定 /app：代码用 Path(__file__).parents[3] 锚定"仓库根/.env"，
-# 容器内 .env 必须挂载到 /app/.env。
+# 配置注入方式：compose 的 env_file 把 deploy/.env.docker 解析成容器环境变量；
+# 代码的配置读取器（pydantic-settings / load_dotenv）都是环境变量优先，
+# 容器内不需要 .env 文件。
 #
 # 云服务器不需要预装 uv / Python：构建阶段在容器内用 pip 安装 uv，
 # 最终镜像自带 .venv，宿主机唯一依赖是 Docker。
