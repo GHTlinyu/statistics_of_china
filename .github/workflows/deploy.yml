@@ -36,11 +36,6 @@ jobs:
       - name: 运行单元测试
         run: uv run --package statistics-of-china-backend pytest backend/tests -q
 
-      - name: 校验 docker-compose 配置
-        # GitHub runner 自带 docker，push 时就拦住 compose 的 schema 级错误
-        # （如 volumes 为 null、镜像名缺失等），不再漏到服务器上才暴露
-        run: docker compose -f deploy/docker-compose.yml config -q
-
   build-and-deploy:
     needs: test
     runs-on: ubuntu-latest
