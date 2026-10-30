@@ -19,6 +19,7 @@ from backend.app.mapper.conversationMapper import ConversationMapper
 from backend.app.mapper.messageMapper import MessageMapper
 from backend.app.model.conversation import Conversation
 from backend.app.model.message import Message
+from backend.app.service.memoryService import MemoryService
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +35,43 @@ class ChatTurn:
     """一轮问答的入参，由依赖在流式开始前准备好。"""
 
     conversation_id: int
+    user_id: int
     question: str
     history: list[BaseMessage]
+    memories: list[dict]
 
 
 def build_event(event_type: str, **data: Any) -> dict[str, Any]:
     """通用 SSE 事件：{"type": ..., "data": {...}}。"""
     return {"type": event_type, "data": data}
+
+
+# 后台记忆提取任务，持有引用避免任务被垃圾回收
+_extraction_tasks: set[asyncio.Task[None]] = set()
+
+
+def _spawn_memory_extraction(user_id: int, conversation_id: int) -> None:
+    """回答落库后异步提取长期记忆，不阻塞 SSE。"""
+    task = asyncio.create_task(
+        asyncio.to_thread(
+            MemoryService.extract_and_save,
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
+    )
+    _extraction_tasks.add(task)
+    task.add_done_callback(_on_extraction_done)
+
+
+def _on_extraction_done(task: asyncio.Task[None]) -> None:
+    _extraction_tasks.discard(task)
+
+    if task.cancelled():
+        return
+
+    error = task.exception()
+    if error is not None:
+        logger.warning("长期记忆后台任务异常", exc_info=error)
 
 
 def prepare_chat_turn(
@@ -54,13 +85,20 @@ def prepare_chat_turn(
         user_id=user_id,
     )
     history = ChatService.load_history(conversation_id=conversation_id)
+    memories = MemoryService.find_long_term_memories(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        current_question=question,
+    )
 
     ChatService.prepare_turn(conversation=conversation, question=question)
 
     return ChatTurn(
         conversation_id=conversation_id,
+        user_id=user_id,
         question=question,
         history=history,
+        memories=memories,
     )
 
 
@@ -145,8 +183,10 @@ class ChatService:
     @staticmethod
     async def stream_answer(
         conversation_id: int,
+        user_id: int,
         question: str,
         history: list[BaseMessage],
+        memories: list[dict],
     ) -> AsyncIterator[dict[str, Any]]:
         """流式执行工作流，产出通用 SSE 事件。"""
         parts: list[str] = []
@@ -158,7 +198,7 @@ class ChatService:
             inputs = {
                 "question": question,
                 "history": history,
-                "memories": [],
+                "memories": memories,
             }
 
             async for chunk in graph.astream(inputs, stream_mode="custom"):
@@ -179,6 +219,10 @@ class ChatService:
                     answer,
                 )
                 saved = True
+                _spawn_memory_extraction(
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                )
 
             yield build_event(
                 "done",

@@ -25,8 +25,8 @@ def find_memories(
 
     history_text = "\n".join(
         [
-            f"{index}. {content}"
-            for index, content in enumerate(
+            f"{index}. {message['content']}"
+            for index, message in enumerate(
                 recent_user_messages,
                 start=1,
             )

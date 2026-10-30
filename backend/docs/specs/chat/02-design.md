@@ -12,14 +12,16 @@ Client
 Controller（依赖 _prepare_turn 先执行）
   ├─ ChatService.get_conversation(id, user_id)   → 不存在/越权：404
   ├─ ChatService.load_history(id, limit=20)      → list[BaseMessage]
+  ├─ MemoryService.find_long_term_memories(...)  → 相关长期记忆（失败降级为空）
   └─ ChatService.prepare_turn(conversation, q)   → 保存 user 消息、补标题、touch
   ▼
 异步生成器（SSE）
   ├─ yield {"type": "start", "data": {...}}
-  ├─ graph.astream({"question", "history", "memories": []}, stream_mode="custom")
+  ├─ graph.astream({"question", "history", "memories"}, stream_mode="custom")
   │    ├─ retrieve_node（async，工具放线程池）
-  │    └─ generate_node（async，token 写入 custom 流）
+  │    └─ generate_node（async，注入记忆 + token 写入 custom 流）
   ├─ 累积回答 → 保存 assistant 消息（线程池）
+  ├─ spawn 后台记忆提取（不阻塞流）
   └─ yield {"type": "done", "data": {...}}
 ```
 
@@ -31,10 +33,12 @@ Controller（依赖 _prepare_turn 先执行）
 backend/app/
 ├── controller/chatController.py    聊天 SSE 接口 + 预校验依赖
 ├── controller/messageController.py 消息增删接口
-├── service/chatService.py          聊天编排（权限、历史、标题、落库、流式）
+├── service/chatService.py          聊天编排（权限、历史、记忆、落库、流式）
+├── service/memoryService.py        长期记忆读写编排（读筛选 / 写提取）
 ├── service/messageService.py       消息增删业务
-├── mapper/messageMapper.py         消息数据访问（扩展原有分页查询）
 ├── mapper/conversationMapper.py    新增 update_title / touch
+├── mapper/memoryMapper.py          长期记忆数据访问
+├── mapper/messageMapper.py         消息数据访问（扩展原有分页查询）
 ├── schema/chatDTO.py               ChatRequest、ChatEvent
 └── schema/messageDTO.py            CreateMessageRequest
 
@@ -89,6 +93,12 @@ data: {"type":"error","data":{"code":"AGENT_EXECUTION_ERROR","message":"生成�
 
 `MessageRepository.find_recent_by_conversation` 按 `created_at desc, id desc` 取最近 20 条再反转成正序；`user → HumanMessage`、`assistant → AIMessage`，`system` 不进入 history（避免注入）。
 
+## 长期记忆
+
+- 读路径在流开始前完成：`MemoryService.find_long_term_memories` 取用户记忆目录（≤10 条）、最近 2 条用户消息和本轮问题，调用 finder 选 ID，回表按 `user_id` 校验后放入 `ChatTurn.memories`。
+- 写路径在 assistant 消息落库后启动：后台线程调用 `MemoryService.extract_and_save`，取最近 20 条消息交给 extractor 生成 `CREATE` / `UPDATE`；满 10 条时同类型走 updater 的 `MERGE` / `REPLACE`，无同类型则替换全局最旧。
+- 两条路径都是 best-effort，失败只记日志，不影响聊天；详细设计见 `backend/docs/specs/memory/02-design.md`。
+
 ## 标题与活跃时间
 
 - `prepare_turn` 中若 `conversation.title` 为空，取 `question[:20]` 写入；
@@ -122,4 +132,4 @@ data: {"type":"error","data":{"code":"AGENT_EXECUTION_ERROR","message":"生成�
 2. **预校验放依赖**：FastAPI 的 SSE 路由直接迭代 async 生成器、不 await 返回对象，404 若写在生成器里会变成半截流；放进依赖即可正常返回 JSON 404。
 3. **短会话**：流式期间不占用连接池连接，避免长事务。
 4. **部分保存**：用户主动停止也应当留下他看过的内容，避免下一轮历史缺失。
-5. **本期不接记忆**：`memories` 固定空列表，记忆节点后续以独立节点接入，不改动本轮链路。
+5. **记忆读写分离**：读在流开始前完成并随 `ChatTurn` 传入，写在 `done` 后由后台任务执行；写失败不影响用户已看到的回答。

@@ -7,9 +7,10 @@ from backend.app.database.database import Base
 
 
 class Memory(Base):
-    """用户记忆。
+    """用户长期记忆。
 
-    与 agent 的集成方式（写入时机、检索方式）尚未确定，此处只落表结构。
+    读写编排见 `backend.app.service.memoryService`：
+    读路径在提问前筛选相关记忆，写路径在回答后由 extractor 更新。
     """
 
     __tablename__ = "memory"

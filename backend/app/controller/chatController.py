@@ -42,7 +42,9 @@ async def chat(
 ) -> AsyncIterator[ServerSentEvent]:
     async for event in ChatService.stream_answer(
         conversation_id=turn.conversation_id,
+        user_id=turn.user_id,
         question=turn.question,
         history=turn.history,
+        memories=turn.memories,
     ):
         yield ServerSentEvent(data=event)

@@ -1,7 +1,7 @@
 """初始化数据库表结构的脚本。
 
 用法:
-    uv run python -m app.database.init_db
+    uv run python -m backend.app.database.init_db
 """
 
 from backend.app.database.database import Base, engine

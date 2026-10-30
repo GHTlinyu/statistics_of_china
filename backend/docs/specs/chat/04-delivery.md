@@ -49,12 +49,16 @@ curl -N -X POST http://127.0.0.1:8000/conversation/5/chat \
 1. 追问依赖上下文（如「那 2023 年呢」），检索只用原始问题、未做 query 改写，召回可能不准。
 2. `TestClient` 会缓冲整个 SSE 响应，本地用它测「中途停止」不能反映真实逐 token 行为；真流式需用 uvicorn + curl / 浏览器验证。
 3. 数据库在联调期间多次掉线（`server closed the connection unexpectedly`），建议配置自动重启。
-4. 长期记忆未接入，`memories` 固定为空。
+4. 长期记忆已接入（见 `backend/docs/specs/memory/`）；finder 在流开始前同步调用，会带来一次额外 LLM 延迟。
 5. 前端尚未接入 SSE，需按 `{"type","data"}` 结构自行解析。
 
 ## 后续建议
 
 1. 追问场景加 query 改写（用最近两三轮拼检索语句）后再检索。
-2. 接入记忆：finder 作为 `retrieve` 前的节点，extractor 在 `done` 后异步执行。
+2. 记忆已接入：finder 在流开始前完成，extractor 在 `done` 后以后台任务执行，详见 `backend/docs/specs/memory/04-delivery.md`。
 3. 前端聊天页按 SSE 事件渲染，`done` 后刷新会话列表。
 4. 补充 chat 的自动化测试（服务层事件序列、断开保存已用脚本验证，可固化为 pytest）。
+
+## 2026-10-29 长期记忆接入
+
+聊天链路已接入长期记忆读写：读路径在流开始前注入相关记忆，写路径在 `done` 后后台提取。改动清单、验证结果与待办见 `backend/docs/specs/memory/04-delivery.md`。
