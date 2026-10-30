@@ -1,0 +1,31 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.venv-ocr
+
+# uv cache
+.uv-cache
+
+# Test artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Secrets
+.env
+deploy/.env.docker
+
+# Frontend (Node.js)
+node_modules/
+
+# Claude Code
+.claude/skills/
+.claude/settings.local.json

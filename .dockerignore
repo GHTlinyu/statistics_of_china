@@ -1,0 +1,24 @@
+# 构建上下文是仓库根，必须排除大文件与密钥，否则上下文可达数 GB
+
+.git
+.venv
+node_modules
+frontend/node_modules
+frontend/dist
+
+**/__pycache__
+**/*.py[co]
+
+.env
+deploy/.env.docker
+deploy/.env.docker.*
+
+# 知识库源数据只在数据入库阶段使用，运行时与构建都不需要
+backend/rag
+backend/docs
+
+.claude
+.agent
+.pytest_cache
+.coverage
+htmlcov

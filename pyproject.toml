@@ -1,0 +1,8 @@
+[project]
+name = "statistics-of-china"
+version = "0.1.1"
+description = "《中国统计年鉴 2025》智能助手（monorepo 工作区根）"
+requires-python = ">=3.12"
+
+[tool.uv.workspace]
+members = ["backend"]

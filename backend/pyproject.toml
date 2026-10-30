@@ -1,0 +1,39 @@
+[project]
+name = "statistics-of-china-backend"
+version = "0.1.1"
+description = "《中国统计年鉴 2025》智能助手后端服务"
+authors = [
+    { name = "Rowan", email = "494887135@qq.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "captcha>=0.7.1",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "langchain-openai>=1.0.0",
+    "langgraph>=1.2.11",
+    "pgvector>=0.5.0",
+    "psycopg[binary]>=3.3.4",
+    "pwdlib[argon2]>=0.2.1",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.2",
+    "pyjwt>=2.10.1",
+    "sqlalchemy>=2.0.52",
+    "uvicorn>=0.52.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore:.*CallSpec2.*:pytest.PytestRemovedIn10Warning",
+]

@@ -1,0 +1,27 @@
+{
+  "name": "statistics-of-china-frontend",
+  "private": true,
+  "version": "0.1.1",
+  "description": "《中国统计年鉴 2025》智能助手前端",
+  "scripts": {
+    "dev": "max dev",
+    "build": "max build",
+    "format": "prettier --cache --write .",
+    "postinstall": "max setup",
+    "setup": "max setup",
+    "start": "npm run dev"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "@umijs/max": "^4.7.27",
+    "antd": "^6.6.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "prettier-plugin-packagejson": "^3.0.2",
+    "typescript": "^5.9.3"
+  }
+}
