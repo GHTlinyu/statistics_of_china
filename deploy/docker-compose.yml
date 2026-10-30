@@ -39,5 +39,5 @@ services:
       - backend
     restart: unless-stopped
     volumes:
-      # HTTPS 证书后补时启用：acme.sh 签好证书后取消注释
-      # - /root/.acme.sh/creative-idea-generator.site_ecc:/etc/nginx/certs:ro
+      # 证书由服务器手工维护（CI 不覆盖该目录），只读挂载进容器
+      - /opt/statistics_of_china/deploy/nginx/certs:/etc/nginx/certs:ro

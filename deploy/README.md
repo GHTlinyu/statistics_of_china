@@ -144,34 +144,33 @@ sudo crontab -e
 
 建议再把 dump 同步到对象存储或另一台机器（本机磁盘坏了备份也就没了）。
 
-## 7. HTTPS 证书（域名已解析到服务器后）
+## 7. HTTPS 证书
 
-用 acme.sh 的 webroot 模式（不中断 nginx）：
+证书文件由服务器手工维护，CI 不碰。约定位置：
 
-```bash
-curl https://get.acme.sh | sh
-~/.acme.sh/acme.sh --issue -d creative-idea-generator.site \
-  -d www.creative-idea-generator.site \
-  -w /var/www/html
-
-# webroot 目录：nginx 容器内是 /usr/share/nginx/html，宿主机上先建目录，
-# 并在 nginx 配置 80 块临时加 location ^~ /.well-known/acme-challenge/
-# { alias /var/www/html/.well-known/acme-challenge/; } 后 reload。
-# 或者用 DNS API 验证（不需要动 nginx），推荐：
-# ~/.acme.sh/acme.sh --issue -d creative-idea-generator.site --dns dns_ali
+```
+/opt/statistics_of_china/deploy/nginx/certs/
+├── fullchain.pem      # 证书链
+└── private.key        # 私钥
 ```
 
-签好后：
+项目文件已配置好：compose 把该目录只读挂载进 nginx 容器（`/etc/nginx/certs`），nginx.conf 的 443 块读取这两个文件，80 端口全部 301 跳转 HTTPS。发布一次（push 或手动触发 CI）后生效。
 
-1. compose 中取消 nginx 的证书卷挂载注释：
-   `- /root/.acme.sh/creative-idea-generator.site_ecc:/etc/nginx/certs:ro`
-   （acme.sh 默认目录；用 `--cert-home` 自定义过则按实际路径）
-2. `deploy/nginx/nginx.conf`：取消 443 server 块注释，并在 80 块加
-   `return 301 https://$host$request_uri;`
-3. 重启：`docker compose -f deploy/docker-compose.yml up -d --build nginx`
-4. 证书续期：acme.sh 默认自动续期，续期后执行
-   `docker compose -f deploy/docker-compose.yml exec nginx nginx -s reload`
-   （或写进 acme.sh 的 `--reloadcmd`）
+验证：
+
+```bash
+curl -I https://creative-idea-generator.site/api/health   # 应返回 200
+curl -I http://creative-idea-generator.site/              # 应返回 301 → https
+```
+
+证书到期后：把新的 `fullchain.pem` / `private.key` 覆盖上传到同一目录，然后：
+
+```bash
+cd /opt/statistics_of_china
+docker compose -f deploy/docker-compose.yml exec nginx nginx -s reload
+```
+
+（无需重新构建镜像；文件是挂载进容器的，reload 即生效。）
 
 ## 8. 更新发布（GitHub Actions）
 
