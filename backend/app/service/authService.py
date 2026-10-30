@@ -16,7 +16,7 @@ class AuthService:
         if UserMapper.find_by_username(db=db, username=username) is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Username already exists",
+                detail="用户名已存在",
             )
 
         return UserMapper.create(
@@ -37,7 +37,7 @@ class AuthService:
             # 不区分"用户名不存在"与"密码错误"，避免用户枚举
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
+                detail="用户名或密码错误",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 

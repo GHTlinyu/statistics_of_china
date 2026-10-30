@@ -14,6 +14,7 @@ PUBLIC_PATHS: frozenset[str] = frozenset(
         "/health",
         "/auth/register",
         "/auth/login",
+        "/auth/captcha",
         "/docs",
         "/redoc",
         "/openapi.json",

@@ -3,6 +3,8 @@ import { defineConfig } from '@umijs/max';
 export default defineConfig({
   antd: {},
   request: {},
+  // Umi 4 + 多异步 chunk 时避免 esbuild helper 冲突
+  esbuildMinifyIIFE: true,
   layout: {
     title: '中国统计年鉴智能助手',
   },

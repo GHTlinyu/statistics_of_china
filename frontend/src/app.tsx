@@ -36,13 +36,20 @@ export const request: RequestConfig = {
   errorConfig: {
     errorHandler: (error: any) => {
       const res = error?.response;
-      const apiMessage = res?.data?.message;
-      if (res?.status === 401) {
+      // 业务异常可能是统一结构 {code,message}，也可能是 FastAPI 默认的 {detail}
+      const apiMessage = res?.data?.message || res?.data?.detail;
+      const url: string = res?.config?.url || error?.config?.url || '';
+      const isAuthRequest =
+        url.endsWith('/auth/login') || url.endsWith('/auth/register');
+
+      // 登录/注册自身返回 401 是凭据错误，不能按会话过期跳转
+      if (res?.status === 401 && !isAuthRequest) {
         localStorage.removeItem('token');
-        message.error(apiMessage || '登录已过期，请重新登录');
+        message.error('登录已过期，请重新登录');
         window.location.href = '/login';
         return;
       }
+
       message.error(apiMessage || error?.message || '网络错误');
     },
   },

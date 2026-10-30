@@ -14,8 +14,8 @@
 | --- | --- | --- |
 | R1 | JWT 签发与校验 | 使用 PyJWT，HS256 签名，载荷含 `sub`（user_id）、`username`、`role`、`exp`。校验失败返回 401。 |
 | R2 | 密码哈希 | 使用 `pwdlib[argon2]`（FastAPI 官方推荐方案），注册时哈希入库，登录时校验。 |
-| R3 | 用户注册接口 | `POST /auth/register`：提交 `username` + `password`，注册成功返回用户信息（201），不签发 token；用户名已存在返回 409。 |
-| R4 | 登录接口 | `POST /auth/login`：验证用户名密码后签发 JWT，返回 `access_token`、`token_type`、过期时长；凭据错误返回 401。 |
+| R3 | 用户注册接口 | `POST /auth/register`：提交 `username` + `password` + `captcha_id` + `captcha_code`，先校验验证码；注册成功返回用户信息（201），不签发 token；验证码错误返回 400，用户名已存在返回 409。 |
+| R4 | 登录接口 | `POST /auth/login`：提交 `username` + `password` + `captcha_id` + `captcha_code`，先校验验证码，再验证用户名密码并签发 JWT；验证码错误返回 400，凭据错误返回 401。 |
 | R5 | 当前用户接口 | `GET /auth/me`：返回当前登录用户信息（token 载荷内容），作为鉴权链路示范。 |
 | R6 | 全项目默认鉴权 | 除白名单外的所有接口默认要求携带合法 `Authorization: Bearer <token>`，保证后续开发的接口自动受保护。 |
 | R7 | 配置化 | JWT 密钥与有效期通过 `.env` 配置（`Settings` 新增 `jwt_secret`、`jwt_expire_minutes`），密钥不写入代码。 |
@@ -25,6 +25,7 @@
 以下路径免鉴权（其余全部默认要求 token）：
 
 - `GET /health`（健康检查探针）
+- `GET /auth/captcha`（获取登录 / 注册验证码）
 - `POST /auth/register`、`POST /auth/login`
 - `GET /docs`、`GET /redoc`、`GET /openapi.json`（开发期 API 文档）
 
@@ -41,3 +42,4 @@
 | --- | --- | --- |
 | 2026-10-26 | 密码哈希由 bcrypt 改为 argon2（pwdlib） | 用户要求采用 FastAPI 官方推荐方案 |
 | 2026-10-26 | 鉴权范围由"仅示范接口"改为"全项目默认鉴权 + 白名单" | 用户要求保证后续开发接口的安全 |
+| 2026-10-30 | 登录 / 注册接入图片验证码，新增公开接口 `GET /auth/captcha` | 避免登录接口被暴力破解，详见 `backend/docs/specs/captcha/` |

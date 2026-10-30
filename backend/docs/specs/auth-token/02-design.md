@@ -11,13 +11,18 @@ app/
 │   ├── security.py        # 密码哈希（pwdlib/argon2）、JWT 签发与解析（PyJWT）
 │   └── deps.py            # FastAPI 依赖：get_current_user（全局鉴权入口）
 ├── controller/
-│   └── authController.py  # POST /auth/register、POST /auth/login、GET /auth/me
+│   └── authController.py  # GET /auth/captcha、POST /auth/register、POST /auth/login、GET /auth/me
 ├── service/
-│   └── authService.py     # 注册、认证业务逻辑
+│   ├── authService.py     # 注册、认证业务逻辑
+│   └── captchaService.py  # 验证码生成、图片渲染与校验
 ├── schema/
-│   └── authDTO.py         # RegisterRequest / LoginRequest / TokenResponse / TokenPayload
-└── mapper/
-    └── userMapper.py      # 新增 find_by_username、create
+│   ├── authDTO.py         # RegisterRequest / LoginRequest / TokenResponse / TokenPayload
+│   └── captchaDTO.py      # CaptchaDTO
+├── mapper/
+│   ├── userMapper.py      # 新增 find_by_username、create
+│   └── captchaMapper.py   # 验证码数据访问
+└── model/
+    └── captcha.py         # captcha 表
 ```
 
 ## 核心机制
@@ -56,27 +61,34 @@ app/
 
 | 方法 | 路径 | 鉴权 | 请求体 | 响应 |
 | --- | --- | --- | --- | --- |
-| POST | `/auth/register` | 公开 | `{username, password}` | 201 `UserDTO`；409 用户名已存在 |
-| POST | `/auth/login` | 公开 | `{username, password}` | 200 `{access_token, token_type, expires_in}`；401 凭据错误 |
+| GET | `/auth/captcha` | 公开 | — | 200 `{captcha_id, image, expires_in}` |
+| POST | `/auth/register` | 公开 | `{username, password, captcha_id, captcha_code}` | 201 `UserDTO`；400 验证码错误；409 用户名已存在 |
+| POST | `/auth/login` | 公开 | `{username, password, captcha_id, captcha_code}` | 200 `{access_token, token_type, expires_in}`；400 验证码错误；401 凭据错误 |
 | GET | `/auth/me` | 需 token | — | 200 当前用户（`TokenPayload` 对应 DTO） |
 | GET | `/user/{id}` | 需 token（自动生效） | — | 200 `UserDTO`；404 |
 
 ## 数据流
 
-- **注册**：controller → service（查重 by username）→ 哈希密码 → mapper.create → 返回 UserDTO（201）。
-- **登录**：controller → service（find_by_username）→ verify_password → security.create_access_token → 返回 token（401 on fail）。
+- **验证码**：`GET /auth/captcha` → `CaptchaService.generate` 生成 4 位字符与 PNG，`code_hash` 入库并清理过期记录 → 返回 `captcha_id` / `image` / `expires_in`。
+- **注册**：controller → 校验验证码（一次性删除）→ service（查重 by username）→ 哈希密码 → mapper.create → 返回 UserDTO（201）。
+- **登录**：controller → 校验验证码（一次性删除）→ service（find_by_username）→ verify_password → security.create_access_token → 返回 token（401 on fail）。
 - **受保护接口**：全局依赖解析 Bearer token → 成功则放行（handler 可按需接收 `TokenPayload`）；失败 401。
 
-## 配置项（`app/database/config.py` Settings 新增）
+验证码的详细设计（表结构、摘要、一次性、前端交互）见 `backend/docs/specs/captcha/02-design.md`。
+
+## 配置项（`app/core/config.py` Settings 新增）
 
 | 配置项 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `jwt_secret` | str | 无（必填） | JWT 签名密钥，由 `.env` 提供 |
 | `jwt_expire_minutes` | int | 1440 | token 有效期（分钟），默认 24h |
+| `captcha_ttl_seconds` | int | 300 | 验证码有效期（秒） |
+| `captcha_length` | int | 4 | 验证码字符数（服务端限制 4~8） |
 
-## 依赖变更（pyproject.toml）
+## 依赖变更（backend/pyproject.toml）
 
 | 包 | 用途 | 兼容性 |
 | --- | --- | --- |
 | `pyjwt>=2.10` | JWT 签发/校验 | 纯 Python，与现有依赖零冲突 |
 | `pwdlib[argon2]>=0.2` | argon2 密码哈希 | 纯 Python + argon2-cffi（有 Windows wheel），与现有依赖零冲突 |
+| `captcha>=0.7.1` | 图片验证码渲染 | 依赖 Pillow，有 Windows / Linux wheel |

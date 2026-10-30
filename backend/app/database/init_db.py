@@ -5,6 +5,7 @@
 """
 
 from backend.app.database.database import Base, engine
+from backend.app.model.captcha import Captcha  # noqa: F401
 from backend.app.model.chunk_retrieval import ChunkRetrieval  # noqa: F401
 from backend.app.model.conversation import Conversation  # noqa: F401
 from backend.app.model.memory import Memory  # noqa: F401

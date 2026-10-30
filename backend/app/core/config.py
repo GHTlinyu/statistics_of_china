@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_expire_minutes: int = 1440
 
+    # 登录 / 注册验证码
+    captcha_ttl_seconds: int = 300
+    captcha_length: int = 4
+
     model_config = SettingsConfigDict(
         env_file=REPO_ROOT / ".env",
         env_file_encoding="utf-8",
