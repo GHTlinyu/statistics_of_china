@@ -68,31 +68,57 @@ jobs:
             soc-backend.tar.gz soc-nginx.tar.gz \
             "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:/tmp/soc-deploy/"
 
-      - name: 服务器加载镜像并重启服务
+      - name: 服务器同步部署文件
         run: |
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
             "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" 'bash -s' <<'REMOTE'
-          set -e
+          set -euo pipefail
+          trap 'echo "[deploy] 失败：第 $LINENO 行，退出码 $?"' ERR
+
+          echo "[deploy][1/4] 进入部署目录 /opt/statistics_of_china"
           cd /opt/statistics_of_china
 
-          echo "[deploy] git pull（部署文件同步）"
+          echo "[deploy][2/4] git pull 开始"
           git pull --ff-only
+          echo "[deploy][2/4] git pull 完成，当前提交：$(git rev-parse --short HEAD)"
+          REMOTE
 
-          echo "[deploy] 保留上一版镜像用于回滚"
+      - name: 服务器加载新镜像
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          trap 'echo "[deploy] 失败：第 $LINENO 行，退出码 $?"' ERR
+
+          echo "[deploy][3/4] 保留上一版镜像用于回滚"
           docker tag soc-backend:latest soc-backend:previous 2>/dev/null || true
           docker tag soc-nginx:latest soc-nginx:previous 2>/dev/null || true
 
-          echo "[deploy] docker load"
+          echo "[deploy][4/4] docker load soc-backend.tar.gz 开始"
           gunzip -c /tmp/soc-deploy/soc-backend.tar.gz | docker load
+          echo "[deploy][4/4] soc-backend 加载完成"
+
+          echo "[deploy][4/4] docker load soc-nginx.tar.gz 开始"
           gunzip -c /tmp/soc-deploy/soc-nginx.tar.gz | docker load
+          echo "[deploy][4/4] soc-nginx 加载完成"
+          REMOTE
 
-          echo "[deploy] compose up"
+      - name: 服务器重启服务与清理
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          trap 'echo "[deploy] 失败：第 $LINENO 行，退出码 $?"' ERR
+
+          echo "[deploy][5/5] compose up 开始"
+          cd /opt/statistics_of_china
           docker compose -f deploy/docker-compose.yml up -d --no-build
+          echo "[deploy][5/5] compose up 完成"
 
-          echo "[deploy] 清理临时文件与悬空镜像"
+          echo "[deploy][5/5] 清理临时文件与悬空镜像"
           rm -rf /tmp/soc-deploy
           docker image prune -f
 
-          echo "[deploy] 状态："
+          echo "[deploy][5/5] 容器状态："
           docker compose -f deploy/docker-compose.yml ps
           REMOTE
