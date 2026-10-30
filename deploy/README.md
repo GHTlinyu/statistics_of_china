@@ -25,7 +25,7 @@
    psql -h 127.0.0.1 -p 5433 -U <user> -d <db> -c "SHOW server_version;"
    ```
 
-2. 服务器已安装 Docker 与 compose 插件（`docker compose version`），以及 git（`git --version`，用于 clone 仓库与 CI 部署时的 `git pull`；Ubuntu 用 `sudo apt install git -y`）。**除此之外宿主机不需要任何运行时**：uv / Python 依赖构建在容器内完成（后端镜像在构建容器里 pip 安装 uv），Node / pnpm 同理（nginx 镜像构建阶段自带）。
+2. 服务器已安装 Docker 与 compose 插件（`docker compose version`）。**除此之外宿主机不需要任何运行时（包括 git）**：uv / Python 依赖构建在容器内完成（后端镜像在构建容器里 pip 安装 uv），Node / pnpm 同理（nginx 镜像构建阶段自带）；部署文件由 CI 直接 scp 上传，服务器不依赖 git 仓库。
 3. 防火墙：22（SSH 密钥登录）、80、443 开放；8000 与 5432 不开放。
 
 ## 1. 导出本地数据（本地执行）
@@ -42,28 +42,28 @@ pg_dump -h 127.0.0.1 -p 5433 -U <user> -d <db> -Fc -f /tmp/soc-backup.dump
 
 dump 包含全部业务数据（账户、会话、消息、长期记忆）与 RAG 向量数据（documents / document_chunks / chunk_retrieval），无需在服务器重跑 OCR 与 embedding 入库。`pg_dump` 同时会带出 `CREATE EXTENSION vector` 语句（恢复时自动处理 pgvector 扩展）。
 
-## 2. 上传代码与配置
+## 2. 服务器目录准备（服务器执行）
+
+服务器**不再需要 git 仓库**：CI 每次发布都会直接上传 `docker-compose.yml` 和镜像，服务器上只需要一个固定目录结构：
 
 ```bash
-# 方式 A：git 分发（推荐，服务器可直连仓库）
-# 目录统一用 /opt/statistics_of_china（CI 的 deploy.yml 远程脚本按这个绝对路径找仓库，
-# 改成别的路径时 workflow 里的 cd 也要同步改）
-sudo mkdir -p /opt && sudo chown $(whoami) /opt
-git clone <repo-url> /opt/statistics_of_china && cd /opt/statistics_of_china
+# 1. 创建部署目录（CI 的 deploy.yml 远程脚本按这个绝对路径操作，改路径需同步改 workflow）
+sudo mkdir -p /opt/statistics_of_china/deploy
+sudo chown -R $(whoami) /opt/statistics_of_china
 
-# 方式 B：本地打包上传
-mkdir -p /opt/statistics_of_china
-tar --exclude=.git --exclude=node_modules --exclude=.venv \
-    -czf soc.tar.gz . && scp soc.tar.gz <server>:/tmp/ && \
-    ssh <server> "tar -xzf /tmp/soc.tar.gz -C /opt/statistics_of_china"
+# 2. 生成生产配置（把本地的 deploy/.env.docker.example 内容复制上来填值，
+#    或先传到 /tmp 再移过来）
+vim /opt/statistics_of_china/deploy/.env.docker
+chmod 600 /opt/statistics_of_china/deploy/.env.docker
 ```
 
-```bash
-# 生成生产配置
-cd /opt/statistics_of_china
-cp deploy/.env.docker.example deploy/.env.docker
-vim deploy/.env.docker
-chmod 600 deploy/.env.docker
+最终结构：
+
+```
+/opt/statistics_of_china/
+└── deploy/
+    ├── docker-compose.yml   ← CI 每次部署自动上传覆盖，无需手工维护
+    └── .env.docker          ← 手工维护一次，CI 不碰
 ```
 
 **填写方法**：打开本地开发用的根目录 `.env` 作为参照，按下表逐项抄改：
@@ -175,24 +175,21 @@ curl https://get.acme.sh | sh
 
 ## 8. 更新发布（GitHub Actions）
 
-推荐走 CI 流水线：GitHub runner 上构建镜像 → scp 传服务器 → 服务器 load 后重启，不需要镜像仓库。
+推荐走 CI 流水线：GitHub runner 上构建镜像 → scp 传服务器 → 服务器 load 后重启，不需要镜像仓库，**服务器也不需要 git**。
 
 ### 8.1 一次性准备
 
-1. 代码推到 GitHub（私有仓库亦可），服务器上 clone 到部署目录：
+1. 代码推到 GitHub，服务器上按第 2 节准备目录：
 
    ```bash
-   # 私有仓库：在服务器生成只读 deploy key，公钥加到 GitHub 仓库
-   # Settings → Deploy keys（只读），然后：
-   git clone git@github.com:<user>/<repo>.git /opt/statistics_of_china
+   sudo mkdir -p /opt/statistics_of_china/deploy
+   sudo chown -R $(whoami) /opt/statistics_of_china
    ```
 
 2. 服务器上创建生产配置（CI 不碰密钥）：
 
    ```bash
-   cd /opt/statistics_of_china
-   cp deploy/.env.docker.example deploy/.env.docker
-   vim deploy/.env.docker && chmod 600 deploy/.env.docker
+   vim /opt/statistics_of_china/deploy/.env.docker && chmod 600 /opt/statistics_of_china/deploy/.env.docker
    ```
 
 3. GitHub 仓库 Settings → Secrets and variables → Actions，新增（与 SSH 连接测试共用）：
@@ -207,7 +204,7 @@ curl https://get.acme.sh | sh
 | 自动 | push 到 `master` 即触发（`.github/workflows/deploy.yml` 已配）；只想手动时注释掉 workflow 里的 `push` 块 |
 | 手动 | Actions 页面 → deploy workflow → Run workflow |
 
-流水线顺序：**单元测试（205 个用例）→ 构建两个镜像 → scp 上传 → 服务器 load + compose up**。测试失败会阻断部署。
+流水线顺序：**单元测试（205 个用例）→ 构建两个镜像 → scp 上传（镜像 + docker-compose.yml）→ 服务器放置部署文件 + load + compose up**。测试失败会阻断部署。
 
 ### 8.3 回滚
 
@@ -221,10 +218,20 @@ docker compose -f deploy/docker-compose.yml up -d --no-build
 
 ### 8.4 无 CI 时的手动发布（备选）
 
+服务器上没有 git 仓库时，手动上传部署文件与镜像：
+
 ```bash
-cd /opt/statistics_of_china
-git pull
-docker compose -f deploy/docker-compose.yml up -d --build
+# 本地：打包镜像 + compose 文件上传
+docker save soc-backend:latest | gzip -1 > soc-backend.tar.gz
+docker save soc-nginx:latest | gzip -1 > soc-nginx.tar.gz
+scp soc-backend.tar.gz soc-nginx.tar.gz deploy/docker-compose.yml <server>:/tmp/soc-deploy/
+
+# 服务器：放置文件 → 加载 → 启动
+mkdir -p /opt/statistics_of_china/deploy
+cp /tmp/soc-deploy/docker-compose.yml /opt/statistics_of_china/deploy/
+gunzip -c /tmp/soc-deploy/soc-backend.tar.gz | docker load
+gunzip -c /tmp/soc-deploy/soc-nginx.tar.gz | docker load
+cd /opt/statistics_of_china && docker compose -f deploy/docker-compose.yml up -d --no-build
 ```
 
 - 后端镜像因依赖声明层缓存，普通代码改动重建很快（只重新 COPY 代码层）。
@@ -237,7 +244,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 | 现象 | 排查 |
 | --- | --- |
 | 流水线在「上传镜像」或「加载镜像」步骤失败 | `ECS_SSH_PRIVATE_KEY` / `ECS_USER` / `ECS_HOST` 三个 secret 是否配置正确；服务器 `authorized_keys` 是否有对应公钥 |
-| 流水线在 `git pull` 步骤失败 | 服务器 clone 的仓库凭证是否还有效；私有仓库用 deploy key 时确认 remote 走 ssh 且 key 已加载 |
+| 流水线在「放置部署文件」步骤失败 | 部署用户对 `/opt/statistics_of_china` 是否有写权限（`sudo chown -R $(whoami) /opt/statistics_of_china`） |
 | backend 起不来，日志报连接 PG 失败 | `deploy/.env.docker` 的 `DB_HOST=127.0.0.1`、`DB_PORT=5432`、库名/用户/密码是否与宿主机 PG 一致；PG 的 `pg_hba.conf` 是否允许 127.0.0.1 的 md5/scram 认证 |
 | entrypoint 报 `permission denied to create extension "vector"` | 数据库用户无扩展权限。用 postgres 超级用户执行一次：`psql -h 127.0.0.1 -U postgres -d <db> -c "CREATE EXTENSION IF NOT EXISTS vector;"`，之后重启容器 |
 | 聊天回答一次性全部吐出（不流式） | nginx 的 `proxy_buffering off` 是否生效（本仓库配置已含）；确认请求走的是 `/api/` 反代而不是直连 8000 |
