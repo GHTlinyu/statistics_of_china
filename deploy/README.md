@@ -25,7 +25,7 @@
    psql -h 127.0.0.1 -p 5433 -U <user> -d <db> -c "SHOW server_version;"
    ```
 
-2. 服务器已安装 Docker 与 compose 插件（`docker compose version`）。**除此之外宿主机不需要任何运行时**：uv / Python 依赖构建在容器内完成（后端镜像在构建容器里 pip 安装 uv），Node / pnpm 同理（nginx 镜像构建阶段自带）。
+2. 服务器已安装 Docker 与 compose 插件（`docker compose version`），以及 git（`git --version`，用于 clone 仓库与 CI 部署时的 `git pull`；Ubuntu 用 `sudo apt install git -y`）。**除此之外宿主机不需要任何运行时**：uv / Python 依赖构建在容器内完成（后端镜像在构建容器里 pip 安装 uv），Node / pnpm 同理（nginx 镜像构建阶段自带）。
 3. 防火墙：22（SSH 密钥登录）、80、443 开放；8000 与 5432 不开放。
 
 ## 1. 导出本地数据（本地执行）
@@ -46,25 +46,42 @@ dump 包含全部业务数据（账户、会话、消息、长期记忆）与 RA
 
 ```bash
 # 方式 A：git 分发（推荐，服务器可直连仓库）
-git clone <repo-url> statistics_of_china && cd statistics_of_china
+# 目录统一用 /opt/statistics_of_china（CI 的 deploy.yml 远程脚本按这个绝对路径找仓库，
+# 改成别的路径时 workflow 里的 cd 也要同步改）
+sudo mkdir -p /opt && sudo chown $(whoami) /opt
+git clone <repo-url> /opt/statistics_of_china && cd /opt/statistics_of_china
 
 # 方式 B：本地打包上传
+mkdir -p /opt/statistics_of_china
 tar --exclude=.git --exclude=node_modules --exclude=.venv \
-    -czf soc.tar.gz . && scp soc.tar.gz <server>:~/ && ssh <server> tar -xzf soc.tar.gz
+    -czf soc.tar.gz . && scp soc.tar.gz <server>:/tmp/ && \
+    ssh <server> "tar -xzf /tmp/soc.tar.gz -C /opt/statistics_of_china"
 ```
 
 ```bash
 # 生成生产配置
-cd statistics_of_china
+cd /opt/statistics_of_china
 cp deploy/.env.docker.example deploy/.env.docker
 vim deploy/.env.docker
-#   必改：DB_PASSWORD、JWT_SECRET（重新生成）、LLM_API_KEY、LLM_EMBEDDING_API_KEY、LLM_RERANK_API_KEY
-#   确认：DB_HOST=127.0.0.1、DB_PORT=5432、DB_NAME/DB_USER 与宿主机 PG 实际一致
-
 chmod 600 deploy/.env.docker
 ```
 
-`.env.docker` 含密钥，已被 `.dockerignore`（不进镜像）和 `.gitignore`（不进 git）同时排除；compose 通过 `env_file` 把它注入运行时的环境变量，容器内等效挂载在 `/app/.env`。
+**填写方法**：打开本地开发用的根目录 `.env` 作为参照，按下表逐项抄改：
+
+| 键 | 怎么填 |
+| --- | --- |
+| `DB_HOST` | 改为 `127.0.0.1`（服务器 PG 在本机；不要抄本地值） |
+| `DB_PORT` | 改为 `5432`（服务器 PG 默认端口；本地是 5433） |
+| `DB_NAME` / `DB_USER` / `DB_PASSWORD` | 以服务器 PG 实际创建的库/用户/密码为准，不是抄本地 |
+| `JWT_SECRET` | 重新生成一个长随机串，不要抄本地 |
+| `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` | 照抄本地 `.env`（外部服务，通用） |
+| `LLM_EMBEDDING_API_KEY` / `LLM_EMBEDDING_BASE_URL` / `LLM_EMBEDDING_MODEL` | 照抄本地（Jina 向量服务，通用） |
+| `LLM_RERANK_API_KEY` / `LLM_RERANK_BASE_URL` / `LLM_RERANK_MODEL` | 照抄本地（同上） |
+| 其余带 `#` 注释的行 | 保持注释，使用默认值 |
+
+为什么不用本地 `.env` 直接传上去：它被 .gitignore 排除、不进 git；数据库地址不同（本地 5433 vs 服务器 5432）；开发密钥与生产环境应隔离。
+
+`.env.docker` 含密钥，已被 `.dockerignore`（不进镜像）和 `.gitignore`（不进 git）同时排除。**容器如何读到它**：compose 的 `env_file` 在 `up` 时把文件的每一行解析成 backend 容器的环境变量（容器内并不存在这个文件）；代码的三个配置读取器（pydantic-settings / load_dotenv）都遵循环境变量优先，直接从环境变量取配置。可用 `docker compose -f deploy/docker-compose.yml exec backend env` 查看注入结果。
 
 ## 3. 恢复数据到服务器 PG（服务器执行）
 
@@ -156,11 +173,57 @@ curl https://get.acme.sh | sh
    `docker compose -f deploy/docker-compose.yml exec nginx nginx -s reload`
    （或写进 acme.sh 的 `--reloadcmd`）
 
-## 8. 更新发布
+## 8. 更新发布（GitHub Actions）
+
+推荐走 CI 流水线：GitHub runner 上构建镜像 → scp 传服务器 → 服务器 load 后重启，不需要镜像仓库。
+
+### 8.1 一次性准备
+
+1. 代码推到 GitHub（私有仓库亦可），服务器上 clone 到部署目录：
+
+   ```bash
+   # 私有仓库：在服务器生成只读 deploy key，公钥加到 GitHub 仓库
+   # Settings → Deploy keys（只读），然后：
+   git clone git@github.com:<user>/<repo>.git /opt/statistics_of_china
+   ```
+
+2. 服务器上创建生产配置（CI 不碰密钥）：
+
+   ```bash
+   cd /opt/statistics_of_china
+   cp deploy/.env.docker.example deploy/.env.docker
+   vim deploy/.env.docker && chmod 600 deploy/.env.docker
+   ```
+
+3. GitHub 仓库 Settings → Secrets and variables → Actions，新增（与 SSH 连接测试共用）：
+   - `ECS_SSH_PRIVATE_KEY`（CI 专用私钥，服务器对应用户的 `authorized_keys` 已放公钥）
+   - `ECS_USER`（部署用户）
+   - `ECS_HOST`（服务器 IP 或域名）
+
+### 8.2 发布方式
+
+| 方式 | 操作 |
+| --- | --- |
+| 自动 | push 到 `master` 即触发（`.github/workflows/deploy.yml` 已配）；只想手动时注释掉 workflow 里的 `push` 块 |
+| 手动 | Actions 页面 → deploy workflow → Run workflow |
+
+流水线顺序：**单元测试（205 个用例）→ 构建两个镜像 → scp 上传 → 服务器 load + compose up**。测试失败会阻断部署。
+
+### 8.3 回滚
+
+部署脚本会在 load 前把上一版镜像标记为 `soc-*-previous`，服务器上回滚：
 
 ```bash
-cd statistics_of_china
-git pull   # 或重新上传代码
+docker tag soc-backend:previous soc-backend:latest
+docker tag soc-nginx:previous soc-nginx:latest
+docker compose -f deploy/docker-compose.yml up -d --no-build
+```
+
+### 8.4 无 CI 时的手动发布（备选）
+
+```bash
+cd /opt/statistics_of_china
+git pull
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
@@ -173,6 +236,8 @@ docker compose -f deploy/docker-compose.yml up -d --build
 
 | 现象 | 排查 |
 | --- | --- |
+| 流水线在「上传镜像」或「加载镜像」步骤失败 | `ECS_SSH_PRIVATE_KEY` / `ECS_USER` / `ECS_HOST` 三个 secret 是否配置正确；服务器 `authorized_keys` 是否有对应公钥 |
+| 流水线在 `git pull` 步骤失败 | 服务器 clone 的仓库凭证是否还有效；私有仓库用 deploy key 时确认 remote 走 ssh 且 key 已加载 |
 | backend 起不来，日志报连接 PG 失败 | `deploy/.env.docker` 的 `DB_HOST=127.0.0.1`、`DB_PORT=5432`、库名/用户/密码是否与宿主机 PG 一致；PG 的 `pg_hba.conf` 是否允许 127.0.0.1 的 md5/scram 认证 |
 | entrypoint 报 `permission denied to create extension "vector"` | 数据库用户无扩展权限。用 postgres 超级用户执行一次：`psql -h 127.0.0.1 -U postgres -d <db> -c "CREATE EXTENSION IF NOT EXISTS vector;"`，之后重启容器 |
 | 聊天回答一次性全部吐出（不流式） | nginx 的 `proxy_buffering off` 是否生效（本仓库配置已含）；确认请求走的是 `/api/` 反代而不是直连 8000 |
