@@ -2,8 +2,8 @@ packages:
   - frontend
 
 # pnpm 10+ 安全策略：仅允许这些依赖执行构建脚本
-onlyBuiltDependencies:
-  - esbuild
-  - core-js
-  - core-js-pure
-  - es5-ext
+allowBuilds:
+  esbuild: true
+  core-js: true
+  core-js-pure: true
+  es5-ext: true
