@@ -11,9 +11,9 @@ export default defineConfig({
   routes: [
     { path: '/', redirect: '/home' },
     {
-      name: '首页',
+      name: '智能问答',
       path: '/home',
-      component: './Home',
+      component: './Chat',
     },
     {
       name: '登录',
