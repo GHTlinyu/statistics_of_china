@@ -1,5 +1,30 @@
-import { message } from 'antd';
+import { GithubFilled } from '@ant-design/icons';
 import type { RequestConfig } from '@umijs/max';
+import { RunTimeLayoutConfig } from '@umijs/max';
+import { message } from 'antd';
+import AccountDropdown from './components/AccountDropdown';
+
+export const layout: RunTimeLayoutConfig = (initialState) => {
+  return {
+    // 常用属性
+    title: '中国统计年鉴智能助手',
+    logo: '/logo.png',
+    layout: 'top',
+    // 默认布局调整
+    avatarProps: {
+      src: 'https://gw.alipayobjects.com/zos/antfincdn/efFD%24IOql2/weixintupian_20170331104822.jpg',
+      size: 'small',
+      title: '用户',
+      render: (props, dom) => {
+        return <AccountDropdown child={dom}></AccountDropdown>;
+      },
+    },
+    footerRender: () => null,
+    menuHeaderRender: undefined,
+    actionsRender: () => [<GithubFilled key="github" />],
+    // 其他属性见：https://procomponents.ant.design/components/layout#prolayout
+  };
+};
 
 /**
  * 全局请求配置：

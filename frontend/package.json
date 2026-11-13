@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
+    "@ant-design/pro-components": "^2.8.10",
     "@ant-design/x": "^2.10.0",
     "@ant-design/x-markdown": "^2.10.0",
     "@ant-design/x-sdk": "^2.10.0",

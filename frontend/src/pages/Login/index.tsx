@@ -158,7 +158,7 @@ const Login: React.FC = () => {
           </Form.Item>
         </Form>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          还没有账号？请调用 POST /auth/register 注册（需同时提交验证码）
+          还没有账号？请联系管理员注册。
         </Text>
       </Card>
     </div>
