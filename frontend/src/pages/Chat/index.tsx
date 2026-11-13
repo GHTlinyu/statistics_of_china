@@ -1,26 +1,3 @@
-import { RobotOutlined, UserOutlined } from '@ant-design/icons';
-import {
-  Bubble,
-  Conversations,
-  Prompts,
-  Sender,
-  Welcome,
-} from '@ant-design/x';
-import { XMarkdown } from '@ant-design/x-markdown';
-import {
-  useXChat,
-  useXConversations,
-} from '@ant-design/x-sdk';
-import type { SSEOutput } from '@ant-design/x-sdk';
-import { request } from '@umijs/max';
-import { Button, Flex, message, Spin } from 'antd';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
 import { conversationApi } from '@/services/chat/conversationApi';
 import {
   ChatRequestError,
@@ -31,8 +8,22 @@ import type {
   ChatInput,
   ChatMessage,
   ConversationDTO,
-  CurrentUser,
 } from '@/services/chat/types';
+import { RobotOutlined, UserOutlined } from '@ant-design/icons';
+import { Bubble, Prompts, Welcome } from '@ant-design/x';
+import { XMarkdown } from '@ant-design/x-markdown';
+import type { SSEOutput } from '@ant-design/x-sdk';
+import { useXChat, useXConversations } from '@ant-design/x-sdk';
+import { Flex, Spin } from 'antd';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import ConversationList from './ConversationList';
+import SenderInput from './SenderInput';
 
 /** 空态建议问题（统计年鉴主题） */
 const PROMPT_ITEMS = [
@@ -56,7 +47,6 @@ const toConversationItem = (c: ConversationDTO) => ({
 });
 
 const Chat: React.FC = () => {
-  const [user, setUser] = useState<CurrentUser | null>(null);
   const [listLoading, setListLoading] = useState(true);
 
   const {
@@ -130,9 +120,7 @@ const Chat: React.FC = () => {
         const partial = messageInfo?.message?.content?.trim();
         return {
           role: 'assistant',
-          content: partial
-            ? `${partial}\n\n> ⏹ 已停止生成`
-            : '已停止生成',
+          content: partial ? `${partial}\n\n> ⏹ 已停止生成` : '已停止生成',
         };
       }
       if (error instanceof ChatRequestError) {
@@ -144,11 +132,6 @@ const Chat: React.FC = () => {
 
   // 挂载时加载用户与会话列表
   useEffect(() => {
-    request('/auth/me')
-      .then((data) => setUser(data))
-      .catch(() => {
-        // 401 已由全局 errorHandler 跳转登录页
-      });
     conversationApi
       .list()
       .then((page) => {
@@ -220,12 +203,6 @@ const Chat: React.FC = () => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    message.success('已退出登录');
-    window.location.href = '/login';
-  };
-
   const bubbleItems = messages.map(({ id, message: msg, status }) => ({
     key: id,
     role: msg.role,
@@ -245,88 +222,35 @@ const Chat: React.FC = () => {
       ),
   }));
 
-  const showWelcome =
-    !isDefaultMessagesRequesting && messages.length === 0;
+  const showWelcome = !isDefaultMessagesRequesting && messages.length === 0;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: 'calc(100vh - 104px)',
-        border: '1px solid #f0f0f0',
-        borderRadius: 12,
-        overflow: 'hidden',
-        background: '#fff',
-      }}
+    <Flex
+      vertical={false}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
     >
       {/* 左侧：会话列表 + 用户区 */}
-      <Flex
-        vertical
-        style={{ width: 260, borderRight: '1px solid #f0f0f0' }}
-      >
-        <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
-          {listLoading ? (
-            <Flex justify="center" style={{ paddingTop: 24 }}>
-              <Spin />
-            </Flex>
-          ) : (
-            <Conversations
-              items={conversations}
-              activeKey={activeConversationKey || undefined}
-              onActiveChange={(key) => setActiveConversationKey(key)}
-              creation={{
-                onClick: () => handleNewConversation(),
-              }}
-              menu={(conversation) => ({
-                items: [
-                  { key: 'delete', label: '删除会话', danger: true },
-                ],
-                onClick: ({ key }) => {
-                  if (key === 'delete') {
-                    handleDeleteConversation(conversation.key);
-                  }
-                },
-              })}
-            />
-          )}
-        </div>
-        <Flex
-          justify="space-between"
-          align="center"
-          style={{
-            padding: 12,
-            borderTop: '1px solid #f0f0f0',
-          }}
-        >
-          <span style={{ color: 'rgba(0,0,0,0.65)' }}>
-            {user?.username ?? ''}
-          </span>
-          <Button size="small" danger onClick={logout}>
-            退出登录
-          </Button>
-        </Flex>
-      </Flex>
+      <ConversationList
+        loading={false}
+        conversations={conversations}
+        activeConversationKey={activeConversationKey}
+        setActiveConversationKey={setActiveConversationKey}
+        handleNewConversation={handleNewConversation}
+        handleDeleteConversation={handleDeleteConversation}
+      />
 
       {/* 右侧：消息流 + 输入框 */}
       <Flex vertical flex={1} style={{ minWidth: 0 }}>
         {isDefaultMessagesRequesting ? (
-          <Flex
-            flex={1}
-            align="center"
-            justify="center"
-          >
+          <Flex flex={1} align="center" justify="center">
             <Spin />
           </Flex>
         ) : (
           <>
             {showWelcome && (
-              <Flex
-                vertical
-                align="center"
-                style={{ paddingTop: 24, paddingBottom: 8 }}
-              >
+              <Flex vertical align="center" style={{ padding: 16 }}>
                 <Welcome
-                  icon={<RobotOutlined />}
+                  icon={null}
                   title="你好，我是《中国统计年鉴 2025》智能助手"
                   description="我可以回答关于中国经济、人口、社会等统计数据的问题"
                   extra={
@@ -362,15 +286,14 @@ const Chat: React.FC = () => {
           </>
         )}
         <div style={{ padding: '0 16px 16px' }}>
-          <Sender
-            loading={isRequesting}
-            onCancel={abort}
-            onSubmit={handleSubmit}
-            placeholder="请输入您的问题，Enter 发送，Shift+Enter 换行"
+          <SenderInput
+            isRequesting={isRequesting}
+            abort={abort}
+            onSend={handleSubmit}
           />
         </div>
       </Flex>
-    </div>
+    </Flex>
   );
 };
 

@@ -2,6 +2,7 @@ import { defineConfig } from '@umijs/max';
 
 export default defineConfig({
   antd: {},
+  favicons: ['/favicon.png'],
   request: {},
   // Umi 4 + 多异步 chunk 时避免 esbuild helper 冲突
   esbuildMinifyIIFE: true,
@@ -14,6 +15,7 @@ export default defineConfig({
       name: '智能问答',
       path: '/home',
       component: './Chat',
+      hideInMenu: true,
     },
     {
       name: '登录',
@@ -24,9 +26,9 @@ export default defineConfig({
   ],
   proxy: {
     '/api': {
-      target: 'http://127.0.0.1:8000',
+      target: 'https://creative-idea-generator.site',
       changeOrigin: true,
-      pathRewrite: { '^/api': '' },
+      pathRewrite: { '^/api': '/api' },
     },
   },
   npmClient: 'pnpm',

@@ -11,5 +11,8 @@
     "build": "pnpm --dir frontend build",
     "format": "pnpm --dir frontend format",
     "setup": "pnpm --dir frontend setup"
+  },
+  "dependencies": {
+    "@ant-design/pro-components": "^2.8.10"
   }
 }
